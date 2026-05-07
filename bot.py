@@ -248,9 +248,9 @@ schedule.every(1).minutes.do(check_news_alerts)
 def run_bot():
 
     send_embed(
-        "✅ Forex Factory Pro Bot LIVE",
-        "XAUUSD & NASDAQ News Alerts Activated",
-        65280
+        "🧪 PRO BOT TEST",
+        "If you see this embed, the pro bot works correctly.",
+    65280
     )
 
     while True:
