@@ -172,6 +172,7 @@ def run_bot():
         time.sleep(30)
 
 if __name__ == "__main__":
+    send_message("🚀 Upgraded Forex Factory Bot Live")
 
     flask_thread = Thread(target=run_flask)
     flask_thread.start()
