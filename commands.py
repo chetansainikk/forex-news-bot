@@ -4,7 +4,7 @@ from discord.ext import commands
 from datetime import datetime
 import pytz
 
-TOKEN = "PASTE_YOUR_DISCORD_BOT_TOKEN"
+TOKEN = "MTUwMjAxMzk4NDMwNjM2ODU5Mg.GUAiNS.ujepl-oXdsLOs145T5N8RSD9kbq9hwxcFBp9VE"
 
 intents = discord.Intents.default()
 
