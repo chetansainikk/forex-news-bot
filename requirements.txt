@@ -4,3 +4,4 @@ schedule
 pytz
 flask
 gunicorn
+lxml
