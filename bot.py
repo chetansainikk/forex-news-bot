@@ -7,174 +7,197 @@ import pytz
 from flask import Flask
 from threading import Thread
 
-# =========================
+# ====================================
 # CONFIG
-# =========================
+# ====================================
 
 DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1501994314086223924/MB-Tp5cFqSoXSBM9yf9T39oYtOCoAKtkjivfyFJd1joU-ZsfFwoyD4Myrg-AYfcR8u87"
 
 TIMEZONE = pytz.timezone("Asia/Kolkata")
 
-sent_events = set()
+sent_alerts = set()
 
-# =========================
+# ====================================
 # FLASK
-# =========================
+# ====================================
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Forex Factory Bot Running"
+    return "Forex Factory News Bot Running"
 
 def run_flask():
     app.run(host='0.0.0.0', port=10000)
 
-# =========================
-# SEND DISCORD MESSAGE
-# =========================
+# ====================================
+# DISCORD MESSAGE
+# ====================================
 
-def send_message(message):
+def send_message(msg):
 
-    requests.post(
-        DISCORD_WEBHOOK,
-        json={"content": message}
-    )
+    try:
 
-# =========================
-# SCRAPE FOREX FACTORY
-# =========================
+        r = requests.post(
+            DISCORD_WEBHOOK,
+            json={"content": msg}
+        )
 
-def scrape_news():
+        print("Discord:", r.status_code)
 
-    url = "https://www.forexfactory.com/calendar"
+    except Exception as e:
 
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+        print("Discord Error:", e)
 
-    r = requests.get(url, headers=headers)
+# ====================================
+# FOREX FACTORY SCRAPER
+# ====================================
 
-    soup = BeautifulSoup(r.text, "html.parser")
+def scrape_forex_factory():
 
-    events = []
+    try:
 
-    rows = soup.find_all("tr")
+        url = "https://www.forexfactory.com/calendar"
 
-    current_date = ""
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
 
-    for row in rows:
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=15
+        )
 
-        text = row.get_text(" ", strip=True)
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
+        )
 
-        if not text:
-            continue
+        rows = soup.find_all("tr")
 
-        # ONLY HIGH IMPACT USD NEWS
-        important_keywords = [
-            "USD",
-            "CPI",
-            "FOMC",
-            "NFP",
-            "Powell",
-            "Interest Rate"
-        ]
+        events = []
 
-        if any(k.lower() in text.lower() for k in important_keywords):
+        for row in rows:
 
-            events.append(text)
+            text = row.get_text(" ", strip=True)
 
-    return events[:15]
+            if not text:
+                continue
 
-# =========================
+            important = [
+                "USD",
+                "Non-Farm",
+                "CPI",
+                "FOMC",
+                "Powell",
+                "Interest Rate"
+            ]
+
+            if any(k.lower() in text.lower() for k in important):
+
+                events.append(text)
+
+        return list(set(events))[:15]
+
+    except Exception as e:
+
+        print("Scraping Error:", e)
+
+        return []
+
+# ====================================
 # WEEKLY NEWS
-# =========================
+# ====================================
 
-def weekly_news():
+def send_weekly_news():
 
-    news = scrape_news()
+    news = scrape_forex_factory()
 
     if not news:
+
+        send_message("⚠️ Could not fetch Forex Factory news")
+
         return
 
-    msg = "📅 **HIGH IMPACT NEWS THIS WEEK**\n\n"
+    msg = (
+        "📅 **HIGH IMPACT USD NEWS THIS WEEK**\n\n"
+        "💰 Affects: XAUUSD & NASDAQ\n\n"
+    )
 
     for event in news:
+
         msg += f"• {event}\n\n"
 
     send_message(msg)
 
-# =========================
-# CHECK UPCOMING EVENTS
-# =========================
+# ====================================
+# 15 MINUTE ALERT SYSTEM
+# ====================================
 
-def check_upcoming_news():
-
-    news = scrape_news()
+def check_news_alerts():
 
     now = datetime.now(TIMEZONE)
 
     current_time = now.strftime("%H:%M")
 
-    for event in news:
+    important_times = [
+        "18:15",
+        "18:45",
+        "19:15",
+        "20:15",
+        "21:15",
+        "22:15",
+        "23:15"
+    ]
 
-        if event in sent_events:
-            continue
+    for t in important_times:
 
-        # VERY BASIC TIME CHECK
-        possible_times = [
-            "18:00",
-            "18:30",
-            "19:00",
-            "20:00",
-            "21:00",
-            "22:00",
-            "23:00"
-        ]
+        if current_time == t:
 
-        for t in possible_times:
+            if t in sent_alerts:
+                continue
 
-            try:
+            send_message(
+                "🚨 **HIGH IMPACT USD NEWS IN 15 MINUTES**\n\n"
+                "⚠️ Reduce risk on XAUUSD & NASDAQ\n"
+                "📉 Expect volatility spikes"
+            )
 
-                event_time = datetime.strptime(t, "%H:%M")
+            sent_alerts.add(t)
 
-                reminder_time = (
-                    event_time - timedelta(minutes=15)
-                ).strftime("%H:%M")
-
-                if current_time == reminder_time:
-
-                    send_message(
-                        f"🚨 **HIGH IMPACT NEWS IN 15 MINUTES**\n\n{event}"
-                    )
-
-                    sent_events.add(event)
-
-            except:
-                pass
-
-# =========================
+# ====================================
 # SCHEDULES
-# =========================
+# ====================================
 
-schedule.every().sunday.at("18:00").do(weekly_news)
+schedule.every().sunday.at("18:00").do(send_weekly_news)
 
-schedule.every(1).minutes.do(check_upcoming_news)
+schedule.every(1).minutes.do(check_news_alerts)
 
-# =========================
+# ====================================
 # MAIN LOOP
-# =========================
+# ====================================
 
 def run_bot():
 
+    send_message(
+        "✅ Forex Factory XAUUSD/NASDAQ Bot LIVE"
+    )
+
     while True:
+
         schedule.run_pending()
+
         time.sleep(30)
 
+# ====================================
+# START
+# ====================================
+
 if __name__ == "__main__":
-    send_message("🚀 Upgraded Forex Factory Bot Live")
 
     flask_thread = Thread(target=run_flask)
+
     flask_thread.start()
 
     run_bot()
