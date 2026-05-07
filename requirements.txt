@@ -1,1 +1,6 @@
-
+requests
+beautifulsoup4
+schedule
+pytz
+flask
+gunicorn
