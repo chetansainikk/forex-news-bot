@@ -124,8 +124,6 @@ def run_bot():
 
 if __name__ == "__main__":
 
-    send_message("✅ TEST MESSAGE FROM FOREX BOT")
-
     flask_thread = Thread(target=run_flask)
     flask_thread.start()
 
