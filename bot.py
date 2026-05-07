@@ -11,7 +11,7 @@ from threading import Thread
 # CONFIG
 # ======================================
 
-DISCORD_WEBHOOK = "PASTE_YOUR_WEBHOOK"
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1501994314086223924/MB-Tp5cFqSoXSBM9yf9T39oYtOCoAKtkjivfyFJd1joU-ZsfFwoyD4Myrg-AYfcR8u87"
 
 TIMEZONE = pytz.timezone("Asia/Kolkata")
 
