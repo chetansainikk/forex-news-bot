@@ -82,6 +82,10 @@ def get_events():
 
                 formatted_time = event_time
 
+                ist_time = datetime.now(
+                    TIMEZONE
+                )
+
             events.append({
                 "title": title,
                 "time": formatted_time,
