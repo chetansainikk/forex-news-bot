@@ -11,7 +11,9 @@ import xml.etree.ElementTree as ET
 # CONFIG
 # =====================================
 
-DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1501994314086223924/MB-Tp5cFqSoXSBM9yf9T39oYtOCoAKtkjivfyFJd1joU-ZsfFwoyD4Myrg-AYfcR8u87"
+import os
+
+DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK")
 
 TIMEZONE = pytz.timezone("Asia/Kolkata")
 
