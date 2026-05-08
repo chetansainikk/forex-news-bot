@@ -90,8 +90,16 @@ def get_events():
 
     ff_time = pytz.utc.localize(ff_time)
 
+    ff_timezone = pytz.timezone(
+    "Etc/GMT-4"
+    )
+
+    ff_time = ff_timezone.localize(
+    ff_time
+    )
+
     ist_time = ff_time.astimezone(
-        TIMEZONE
+    TIMEZONE
     )
 
     formatted_time = ist_time.strftime(
