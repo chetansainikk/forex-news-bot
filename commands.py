@@ -79,11 +79,34 @@ def get_events():
                     and impact == "High"
                 ):
 
-                    events.append({
-                        "title": title,
-                        "date": date,
-                        "time": event_time
-                    })
+                        try:
+
+    dt_string = f"{date} {event_time}"
+
+    ff_time = datetime.strptime(
+        dt_string,
+        "%m-%d-%Y %I:%M%p"
+    )
+
+    ff_time = pytz.utc.localize(ff_time)
+
+    ist_time = ff_time.astimezone(
+        TIMEZONE
+    )
+
+    formatted_time = ist_time.strftime(
+        "%I:%M %p IST"
+    )
+
+except:
+
+    formatted_time = event_time
+
+events.append({
+    "title": title,
+    "date": date,
+    "time": formatted_time
+})
 
             except:
                 pass
