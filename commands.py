@@ -2,6 +2,8 @@ import os
 import discord
 from discord.ext import commands
 from discord import app_commands
+import requests
+import xml.etree.ElementTree as ET
 from datetime import datetime
 import pytz
 
@@ -9,12 +11,13 @@ import pytz
 # CONFIG
 # =====================================
 
-TOKEN = os.environ.get(
-    "DISCORD_TOKEN"
-)
+TOKEN = os.environ.get("DISCORD_TOKEN")
 
-TIMEZONE = pytz.timezone(
-    "Asia/Kolkata"
+TIMEZONE = pytz.timezone("Asia/Kolkata")
+
+FOREX_FACTORY_XML = (
+    "https://nfs.faireconomy.media/"
+    "ff_calendar_thisweek.xml"
 )
 
 # =====================================
@@ -29,6 +32,71 @@ bot = commands.Bot(
 )
 
 # =====================================
+# GET EVENTS FROM XML
+# =====================================
+
+def get_events():
+
+    try:
+
+        response = requests.get(
+            FOREX_FACTORY_XML,
+            timeout=15
+        )
+
+        root = ET.fromstring(
+            response.content
+        )
+
+        events = []
+
+        for item in root.findall("event"):
+
+            try:
+
+                country = (
+                    item.find("country").text
+                )
+
+                impact = (
+                    item.find("impact").text
+                )
+
+                title = (
+                    item.find("title").text
+                )
+
+                date = (
+                    item.find("date").text
+                )
+
+                event_time = (
+                    item.find("time").text
+                )
+
+                if (
+                    country == "USD"
+                    and impact == "High"
+                ):
+
+                    events.append({
+                        "title": title,
+                        "date": date,
+                        "time": event_time
+                    })
+
+            except:
+                pass
+
+        return events
+
+    except Exception as e:
+
+        print("XML Error:", e)
+
+        return []
+
+# =====================================
 # READY EVENT
 # =====================================
 
@@ -37,9 +105,7 @@ async def on_ready():
 
     await bot.tree.sync()
 
-    print(
-        f"Logged in as {bot.user}"
-    )
+    print(f"Logged in as {bot.user}")
 
 # =====================================
 # /news_today
@@ -53,12 +119,36 @@ async def news_today(
     interaction: discord.Interaction
 ):
 
-    msg = (
-        "📅 Today's High Impact USD News\n\n"
-        "🇺🇸 CPI m/m — 6:00 PM IST\n"
-        "🇺🇸 FOMC — 11:30 PM IST\n"
-        "🇺🇸 Powell Speaks — 8:00 PM IST"
-    )
+    events = get_events()
+
+    today = datetime.now(
+        TIMEZONE
+    ).strftime("%m-%d-%Y")
+
+    today_events = []
+
+    for e in events:
+
+        if e["date"] == today:
+
+            today_events.append(e)
+
+    if not today_events:
+
+        await interaction.response.send_message(
+            "✅ No major USD news today."
+        )
+
+        return
+
+    msg = "📅 Today's High Impact USD News\n\n"
+
+    for e in today_events:
+
+        msg += (
+            f"🇺🇸 {e['title']}\n"
+            f"🕒 {e['time']}\n\n"
+        )
 
     await interaction.response.send_message(
         msg
@@ -70,19 +160,32 @@ async def news_today(
 
 @bot.tree.command(
     name="nextnews",
-    description="Next major USD event"
+    description="Next high impact USD event"
 )
 async def nextnews(
     interaction: discord.Interaction
 ):
 
+    events = get_events()
+
+    if not events:
+
+        await interaction.response.send_message(
+            "No events found."
+        )
+
+        return
+
+    e = events[0]
+
     msg = (
-        "🚨 Next High Impact Event\n\n"
-        "🇺🇸 Non-Farm Payrolls\n"
-        "🕒 Friday 6:00 PM IST\n\n"
-        "Affected:\n"
-        "• XAUUSD\n"
-        "• NASDAQ"
+        f"🚨 Next High Impact USD Event\n\n"
+        f"🇺🇸 {e['title']}\n"
+        f"📅 {e['date']}\n"
+        f"🕒 {e['time']}\n\n"
+        f"Affects:\n"
+        f"• XAUUSD\n"
+        f"• NASDAQ"
     )
 
     await interaction.response.send_message(
@@ -101,37 +204,23 @@ async def countdown(
     interaction: discord.Interaction
 ):
 
-    now = datetime.now(TIMEZONE)
+    events = get_events()
 
-    target = now.replace(
-        hour=18,
-        minute=0,
-        second=0
-    )
-
-    if now > target:
+    if not events:
 
         await interaction.response.send_message(
-            "No major news today"
+            "No events found."
         )
 
         return
 
-    remaining = target - now
-
-    hours, remainder = divmod(
-        int(remaining.total_seconds()),
-        3600
-    )
-
-    minutes, seconds = divmod(
-        remainder,
-        60
-    )
+    e = events[0]
 
     msg = (
-        f"⏳ Next USD News In:\n\n"
-        f"{hours}h {minutes}m {seconds}s"
+        f"⏳ Countdown To Next News\n\n"
+        f"🇺🇸 {e['title']}\n"
+        f"📅 {e['date']}\n"
+        f"🕒 {e['time']}"
     )
 
     await interaction.response.send_message(
@@ -151,12 +240,11 @@ async def gold_bias(
 ):
 
     msg = (
-        "🟡 XAUUSD Bias: Bullish\n\n"
+        "🟡 XAUUSD Bias: Neutral/Bullish\n\n"
         "Reason:\n"
-        "• DXY weak\n"
-        "• Bonds soft\n"
-        "• Risk sentiment positive\n"
-        "• USD news approaching"
+        "• USD high impact news nearby\n"
+        "• Volatility expected\n"
+        "• Trade with reduced risk"
     )
 
     await interaction.response.send_message(
@@ -177,10 +265,10 @@ async def risk(
 
     msg = (
         "⚠️ Risk Management Checklist\n\n"
-        "• Risk 0.5%–1% max\n"
-        "• Avoid revenge trades\n"
+        "• Risk 0.5%–1%\n"
         "• Reduce size before news\n"
-        "• Respect daily drawdown"
+        "• Avoid revenge trading\n"
+        "• Protect funded account"
     )
 
     await interaction.response.send_message(
@@ -199,7 +287,9 @@ async def session(
     interaction: discord.Interaction
 ):
 
-    now = datetime.now(TIMEZONE)
+    now = datetime.now(
+        TIMEZONE
+    )
 
     hour = now.hour
 
@@ -217,15 +307,10 @@ async def session(
 
     else:
 
-        current = "Low Liquidity Hours"
-
-    msg = (
-        f"🌍 Current Session:\n\n"
-        f"{current}"
-    )
+        current = "Low Liquidity"
 
     await interaction.response.send_message(
-        msg
+        f"🌍 Current Session:\n\n{current}"
     )
 
 # =====================================
