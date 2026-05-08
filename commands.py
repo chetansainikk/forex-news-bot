@@ -71,8 +71,12 @@ def get_events():
                         "%m-%d-%Y %I:%M%p"
                     )
 
-                    # ForexFactory XML times are UTC
-                    ff_time = pytz.utc.localize(
+                    # Forex Factory calendar feed uses New York time
+                    ff_timezone = pytz.timezone(
+                        "America/New_York"
+                    )
+
+                    ff_time = ff_timezone.localize(
                         ff_time
                     )
 
