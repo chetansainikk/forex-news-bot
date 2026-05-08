@@ -135,7 +135,9 @@ async def news_today(
     interaction: discord.Interaction
 ):
 
-    await interaction.response.defer()
+    await interaction.response.defer(
+        thinking=True
+    )
 
     events = get_events()
 
@@ -170,7 +172,9 @@ async def nextnews(
     interaction: discord.Interaction
 ):
 
-    await interaction.response.defer()
+    await interaction.response.defer(
+        thinking=True
+    )
 
     events = get_events()
 
@@ -213,7 +217,9 @@ async def countdown(
     interaction: discord.Interaction
 ):
 
-    await interaction.response.defer()
+    await interaction.response.defer(
+        thinking=True
+    )
 
     events = get_events()
 
