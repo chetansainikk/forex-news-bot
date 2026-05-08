@@ -53,7 +53,7 @@ def get_events():
 
             try:
 
-                currency = item.find("country").text
+                currency = item.find("currency").text
                 impact = item.find("impact").text
                 title = item.find("title").text
                 date = item.find("date").text
