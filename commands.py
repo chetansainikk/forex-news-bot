@@ -1,28 +1,25 @@
-import os
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime
 import pytz
+import os
 
-# =====================================
+# ==================================================
 # CONFIG
-# =====================================
+# ==================================================
 
-TOKEN = os.environ.get("DISCORD_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 TIMEZONE = pytz.timezone("Asia/Kolkata")
 
-FOREX_FACTORY_XML = (
-    "https://nfs.faireconomy.media/"
-    "ff_calendar_thisweek.xml"
-)
+XML_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
 
-# =====================================
+# ==================================================
 # BOT SETUP
-# =====================================
+# ==================================================
 
 intents = discord.Intents.default()
 
@@ -31,103 +28,75 @@ bot = commands.Bot(
     intents=intents
 )
 
-# =====================================
-# GET EVENTS FROM XML
-# =====================================
+# ==================================================
+# FETCH EVENTS
+# ==================================================
 
 def get_events():
 
-    try:
+    response = requests.get(XML_URL)
 
-        response = requests.get(
-            FOREX_FACTORY_XML,
-            timeout=15
-        )
+    root = ET.fromstring(response.content)
 
-        root = ET.fromstring(
-            response.content
-        )
+    events = []
 
-        events = []
+    for item in root.findall("event"):
 
-        for item in root.findall("event"):
+        currency = item.find("country").text
+        impact = item.find("impact").text
+        title = item.find("title").text
+        date = item.find("date").text
+        event_time = item.find("time").text
+
+        if (
+            currency == "USD"
+            and impact == "High"
+        ):
 
             try:
 
-                country = (
-                    item.find("country").text
+                dt_string = f"{date} {event_time}"
+
+                ff_time = datetime.strptime(
+                    dt_string,
+                    "%m-%d-%Y %I:%M%p"
                 )
 
-                impact = (
-                    item.find("impact").text
+                ff_timezone = pytz.timezone(
+                    "Etc/GMT-4"
                 )
 
-                title = (
-                    item.find("title").text
+                ff_time = ff_timezone.localize(
+                    ff_time
                 )
 
-                date = (
-                    item.find("date").text
+                ist_time = ff_time.astimezone(
+                    TIMEZONE
                 )
 
-                event_time = (
-                    item.find("time").text
+                formatted_time = ist_time.strftime(
+                    "%d %b • %I:%M %p IST"
                 )
-
-                if (
-                    country == "USD"
-                    and impact == "High"
-                ):
-
-                    try:
-
-                        dt_string = f"{date} {event_time}"
-
-                        ff_time = datetime.strptime(
-                            dt_string,
-                            "%m-%d-%Y %I:%M%p"
-                        )
-
-                        ff_timezone = pytz.timezone(
-                            "Etc/GMT-4"
-                        )
-
-                        ff_time = ff_timezone.localize(
-                            ff_time
-                        )
-
-                        ist_time = ff_time.astimezone(
-                            TIMEZONE
-                        )
-
-                        formatted_time = ist_time.strftime(
-                            "%I:%M %p IST"
-                        )
-
-                    except:
-
-                        formatted_time = event_time
-
-                    events.append({
-                        "title": title,
-                        "date": date,
-                        "time": formatted_time
-                    })
 
             except:
-                pass
 
-        return events
+                formatted_time = event_time
 
-    except Exception as e:
+            events.append({
+                "title": title,
+                "time": formatted_time,
+                "datetime": ist_time
+            })
 
-        print("XML Error:", e)
+    events.sort(
+        key=lambda x: x["datetime"]
+    )
 
-        return []
+    return events
 
-# =====================================
-# READY EVENT
-# =====================================
+# ==================================================
+# READY
+# ==================================================
 
 @bot.event
 async def on_ready():
@@ -136,214 +105,131 @@ async def on_ready():
 
     print(f"Logged in as {bot.user}")
 
-# =====================================
+# ==================================================
 # /news_today
-# =====================================
+# ==================================================
 
 @bot.tree.command(
     name="news_today",
-    description="Today's high impact USD news"
+    description="Shows upcoming high impact USD news"
 )
 async def news_today(
     interaction: discord.Interaction
 ):
 
+    await interaction.response.defer()
+
     events = get_events()
 
-    today = datetime.now(
-        TIMEZONE
-    ).strftime("%m-%d-%Y")
+    if not events:
 
-    today_events = []
-
-    for e in events:
-
-        if e["date"] == today:
-
-            today_events.append(e)
-
-    if not today_events:
-
-        await interaction.response.send_message(
-            "✅ No major USD news today."
+        await interaction.followup.send(
+            "❌ No major USD news found."
         )
 
         return
 
-    msg = "📅 Today's High Impact USD News\n\n"
+    msg = "📅 **Upcoming High Impact USD News**\n\n"
 
-    for e in today_events:
+    for e in events[:5]:
 
         msg += (
             f"🇺🇸 {e['title']}\n"
             f"🕒 {e['time']}\n\n"
         )
 
-    await interaction.response.send_message(
-        msg
-    )
+    await interaction.followup.send(msg)
 
-# =====================================
+# ==================================================
 # /nextnews
-# =====================================
+# ==================================================
 
 @bot.tree.command(
     name="nextnews",
-    description="Next high impact USD event"
+    description="Shows next upcoming news event"
 )
 async def nextnews(
     interaction: discord.Interaction
 ):
 
+    await interaction.response.defer()
+
     events = get_events()
 
-    if not events:
+    now = datetime.now(TIMEZONE)
 
-        await interaction.response.send_message(
-            "No events found."
+    future_events = [
+        e for e in events
+        if e["datetime"] > now
+    ]
+
+    if not future_events:
+
+        await interaction.followup.send(
+            "❌ No upcoming news found."
         )
 
         return
 
-    e = events[0]
+    e = future_events[0]
 
     msg = (
-        f"🚨 Next High Impact USD Event\n\n"
+        f"🚨 **Next High Impact USD News**\n\n"
         f"🇺🇸 {e['title']}\n"
-        f"📅 {e['date']}\n"
-        f"🕒 {e['time']}\n\n"
-        f"Affects:\n"
-        f"• XAUUSD\n"
-        f"• NASDAQ"
+        f"🕒 {e['time']}"
     )
 
-    await interaction.response.send_message(
-        msg
-    )
+    await interaction.followup.send(msg)
 
-# =====================================
+# ==================================================
 # /countdown
-# =====================================
+# ==================================================
 
 @bot.tree.command(
     name="countdown",
-    description="Countdown to next USD news"
+    description="Countdown to next high impact news"
 )
 async def countdown(
     interaction: discord.Interaction
 ):
 
+    await interaction.response.defer()
+
     events = get_events()
 
-    if not events:
+    now = datetime.now(TIMEZONE)
 
-        await interaction.response.send_message(
-            "No events found."
+    future_events = [
+        e for e in events
+        if e["datetime"] > now
+    ]
+
+    if not future_events:
+
+        await interaction.followup.send(
+            "❌ No upcoming news."
         )
 
         return
 
-    e = events[0]
+    e = future_events[0]
+
+    diff = e["datetime"] - now
+
+    hours = diff.seconds // 3600
+    minutes = (diff.seconds % 3600) // 60
 
     msg = (
-        f"⏳ Countdown To Next News\n\n"
+        f"⏳ **Countdown To News**\n\n"
         f"🇺🇸 {e['title']}\n"
-        f"📅 {e['date']}\n"
-        f"🕒 {e['time']}"
+        f"🕒 {e['time']}\n\n"
+        f"⏱ {hours}h {minutes}m remaining"
     )
 
-    await interaction.response.send_message(
-        msg
-    )
+    await interaction.followup.send(msg)
 
-# =====================================
-# /gold_bias
-# =====================================
+# ==================================================
+# RUN BOT
+# ==================================================
 
-@bot.tree.command(
-    name="gold_bias",
-    description="XAUUSD market bias"
-)
-async def gold_bias(
-    interaction: discord.Interaction
-):
-
-    msg = (
-        "🟡 XAUUSD Bias: Neutral/Bullish\n\n"
-        "Reason:\n"
-        "• USD high impact news nearby\n"
-        "• Volatility expected\n"
-        "• Trade with reduced risk"
-    )
-
-    await interaction.response.send_message(
-        msg
-    )
-
-# =====================================
-# /risk
-# =====================================
-
-@bot.tree.command(
-    name="risk",
-    description="Risk management reminder"
-)
-async def risk(
-    interaction: discord.Interaction
-):
-
-    msg = (
-        "⚠️ Risk Management Checklist\n\n"
-        "• Risk 0.5%–1%\n"
-        "• Reduce size before news\n"
-        "• Avoid revenge trading\n"
-        "• Protect funded account"
-    )
-
-    await interaction.response.send_message(
-        msg
-    )
-
-# =====================================
-# /session
-# =====================================
-
-@bot.tree.command(
-    name="session",
-    description="Current trading session"
-)
-async def session(
-    interaction: discord.Interaction
-):
-
-    now = datetime.now(
-        TIMEZONE
-    )
-
-    hour = now.hour
-
-    if 5 <= hour < 13:
-
-        current = "Asian Session"
-
-    elif 13 <= hour < 17:
-
-        current = "London Session"
-
-    elif 17 <= hour < 23:
-
-        current = "New York Session"
-
-    else:
-
-        current = "Low Liquidity"
-
-    await interaction.response.send_message(
-        f"🌍 Current Session:\n\n{current}"
-    )
-
-# =====================================
-# START BOT
-# =====================================
-
-bot.run(TOKEN)
+bot.run(BOT_TOKEN)
