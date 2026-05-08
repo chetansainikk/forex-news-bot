@@ -34,69 +34,82 @@ bot = commands.Bot(
 
 def get_events():
 
-    response = requests.get(XML_URL)
+    try:
 
-    root = ET.fromstring(response.content)
+        response = requests.get(
+            XML_URL,
+            timeout=10
+        )
 
-    events = []
+        response.raise_for_status()
 
-    for item in root.findall("event"):
+        root = ET.fromstring(
+            response.content
+        )
 
-        currency = item.find("country").text
-        impact = item.find("impact").text
-        title = item.find("title").text
-        date = item.find("date").text
-        event_time = item.find("time").text
+        events = []
 
-        if (
-            currency == "USD"
-            and impact == "High"
-        ):
+        for item in root.findall("event"):
 
             try:
 
-                dt_string = f"{date} {event_time}"
+                currency = item.find("country").text
+                impact = item.find("impact").text
+                title = item.find("title").text
+                date = item.find("date").text
+                event_time = item.find("time").text
 
-                ff_time = datetime.strptime(
-                    dt_string,
-                    "%m-%d-%Y %I:%M%p"
-                )
+                if (
+                    currency == "USD"
+                    and impact == "High"
+                ):
 
-                ff_timezone = pytz.timezone(
-                    "Etc/GMT-4"
-                )
+                    dt_string = f"{date} {event_time}"
 
-                ff_time = ff_timezone.localize(
-                    ff_time
-                )
+                    ff_time = datetime.strptime(
+                        dt_string,
+                        "%m-%d-%Y %I:%M%p"
+                    )
 
-                ist_time = ff_time.astimezone(
-                    TIMEZONE
-                )
+                    ff_timezone = pytz.timezone(
+                        "Etc/GMT-4"
+                    )
 
-                formatted_time = ist_time.strftime(
-                    "%d %b • %I:%M %p IST"
-                )
+                    ff_time = ff_timezone.localize(
+                        ff_time
+                    )
 
-            except:
+                    ist_time = ff_time.astimezone(
+                        TIMEZONE
+                    )
 
-                formatted_time = event_time
+                    formatted_time = ist_time.strftime(
+                        "%d %b • %I:%M %p IST"
+                    )
 
-                ist_time = datetime.now(
-                    TIMEZONE
-                )
+                    events.append({
+                        "title": title,
+                        "time": formatted_time,
+                        "datetime": ist_time
+                    })
 
-            events.append({
-                "title": title,
-                "time": formatted_time,
-                "datetime": ist_time
-            })
+            except Exception as e:
 
-    events.sort(
-        key=lambda x: x["datetime"]
-    )
+                print("EVENT ERROR:", e)
 
-    return events
+                continue
+
+        events.sort(
+            key=lambda x: x["datetime"]
+        )
+
+        return events
+
+    except Exception as e:
+
+        print("XML ERROR:", e)
+
+        return []
 
 # ==================================================
 # READY
@@ -160,7 +173,9 @@ async def nextnews(
 
     events = get_events()
 
-    now = datetime.now(TIMEZONE)
+    now = datetime.now(
+        TIMEZONE
+    )
 
     future_events = [
         e for e in events
@@ -201,7 +216,9 @@ async def countdown(
 
     events = get_events()
 
-    now = datetime.now(TIMEZONE)
+    now = datetime.now(
+        TIMEZONE
+    )
 
     future_events = [
         e for e in events
@@ -220,8 +237,14 @@ async def countdown(
 
     diff = e["datetime"] - now
 
-    hours = diff.seconds // 3600
-    minutes = (diff.seconds % 3600) // 60
+    total_seconds = int(
+        diff.total_seconds()
+    )
+
+    hours = total_seconds // 3600
+    minutes = (
+        total_seconds % 3600
+    ) // 60
 
     msg = (
         f"⏳ **Countdown To News**\n\n"
@@ -231,6 +254,82 @@ async def countdown(
     )
 
     await interaction.followup.send(msg)
+
+# ==================================================
+# /gold_bias
+# ==================================================
+
+@bot.tree.command(
+    name="gold_bias",
+    description="Current XAUUSD bias"
+)
+async def gold_bias(
+    interaction: discord.Interaction
+):
+
+    await interaction.response.send_message(
+        "🟡 XAUUSD Bias:\n\n"
+        "Volatility expected around USD news.\n"
+        "Reduce lot size near high impact events."
+    )
+
+# ==================================================
+# /risk
+# ==================================================
+
+@bot.tree.command(
+    name="risk",
+    description="Risk management reminder"
+)
+async def risk(
+    interaction: discord.Interaction
+):
+
+    await interaction.response.send_message(
+        "⚠️ Risk Management Reminder\n\n"
+        "• Risk 0.5%–1%\n"
+        "• Avoid revenge trading\n"
+        "• Protect funded account\n"
+        "• News = volatility"
+    )
+
+# ==================================================
+# /session
+# ==================================================
+
+@bot.tree.command(
+    name="session",
+    description="Current market session"
+)
+async def session(
+    interaction: discord.Interaction
+):
+
+    now = datetime.now(
+        TIMEZONE
+    )
+
+    hour = now.hour
+
+    if 5 <= hour < 13:
+
+        current = "Asian Session"
+
+    elif 13 <= hour < 17:
+
+        current = "London Session"
+
+    elif 17 <= hour < 23:
+
+        current = "New York Session"
+
+    else:
+
+        current = "Low Liquidity"
+
+    await interaction.response.send_message(
+        f"🌍 Current Session:\n\n{current}"
+    )
 
 # ==================================================
 # RUN BOT
