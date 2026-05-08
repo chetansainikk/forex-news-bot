@@ -12,8 +12,7 @@ import xml.etree.ElementTree as ET
 # CONFIG
 # =====================================
 
-DISCORD_WEBHOOK = os.environ.get(
-    "DISCORD_WEBHOOK"
+DISCORD_WEBHOOK =  os.environ.get("DISCORD_WEBHOOK")
 )
 
 FOREX_FACTORY_XML = (
