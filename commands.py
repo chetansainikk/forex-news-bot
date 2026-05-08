@@ -1,8 +1,10 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
+
 import requests
 import xml.etree.ElementTree as ET
+
 from datetime import datetime
 import pytz
 import os
@@ -13,9 +15,9 @@ import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-TIMEZONE = pytz.timezone("Asia/Kolkata")
-
 XML_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
+
+TIMEZONE = pytz.timezone("Asia/Kolkata")
 
 # ==================================================
 # BOT SETUP
@@ -29,7 +31,7 @@ bot = commands.Bot(
 )
 
 # ==================================================
-# FETCH EVENTS
+# GET EVENTS
 # ==================================================
 
 def get_events():
@@ -59,10 +61,8 @@ def get_events():
                 date = item.find("date").text
                 event_time = item.find("time").text
 
-                if (
-                    currency == "USD"
-                    and impact == "High"
-                ):
+                # ONLY USD HIGH IMPACT
+                if currency == "USD" and impact == "High":
 
                     dt_string = f"{date} {event_time}"
 
@@ -71,6 +71,7 @@ def get_events():
                         "%m-%d-%Y %I:%M%p"
                     )
 
+                    # ForexFactory XML times are UTC
                     ff_time = pytz.utc.localize(
                         ff_time
                     )
@@ -264,9 +265,9 @@ async def gold_bias(
 ):
 
     await interaction.response.send_message(
-        "🟡 XAUUSD Bias:\n\n"
-        "Volatility expected around USD news.\n"
-        "Reduce lot size near high impact events."
+        "🟡 XAUUSD Bias\n\n"
+        "High impact USD news nearby.\n"
+        "Expect volatility in Gold & NASDAQ."
     )
 
 # ==================================================
@@ -282,11 +283,10 @@ async def risk(
 ):
 
     await interaction.response.send_message(
-        "⚠️ Risk Management Reminder\n\n"
+        "⚠️ Risk Management\n\n"
         "• Risk 0.5%–1%\n"
-        "• Avoid revenge trading\n"
-        "• Protect funded account\n"
-        "• News = volatility"
+        "• Reduce lot size near news\n"
+        "• Protect funded account"
     )
 
 # ==================================================
@@ -328,7 +328,7 @@ async def session(
     )
 
 # ==================================================
-# RUN BOT
+# RUN
 # ==================================================
 
 bot.run(BOT_TOKEN)
