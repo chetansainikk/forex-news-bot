@@ -71,11 +71,7 @@ def get_events():
                         "%m-%d-%Y %I:%M%p"
                     )
 
-                    ff_timezone = pytz.timezone(
-                        "Etc/GMT-4"
-                    )
-
-                    ff_time = ff_timezone.localize(
+                    ff_time = pytz.utc.localize(
                         ff_time
                     )
 
