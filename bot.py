@@ -232,6 +232,15 @@ def weekly_summary():
 
     events = get_events()
 
+    now = datetime.now(
+    TIMEZONE
+    )
+
+    events = [
+    e for e in events
+    if e["datetime"] > now
+    ]
+
     if not events:
 
         return
