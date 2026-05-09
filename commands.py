@@ -13,11 +13,22 @@ import os
 # CONFIG
 # ==================================================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv(
+    "BOT_TOKEN"
+)
 
-XML_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
+XML_URL = (
+    "https://nfs.faireconomy.media/"
+    "ff_calendar_thisweek.xml"
+)
 
-TIMEZONE = pytz.timezone("Asia/Kolkata")
+TIMEZONE = pytz.timezone(
+    "Asia/Kolkata"
+)
+
+FF_TIMEZONE = pytz.timezone(
+    "America/New_York"
+)
 
 # ==================================================
 # BOT SETUP
@@ -55,37 +66,68 @@ def get_events():
 
             try:
 
-                currency = item.find("currency").text
-                impact = item.find("impact").text
-                title = item.find("title").text
-                date = item.find("date").text
-                event_time = item.find("time").text
+                currency = ""
 
-                # ONLY USD HIGH IMPACT
-                if currency == "USD" and impact == "High":
+                if item.find("currency") is not None:
 
-                    dt_string = f"{date} {event_time}"
+                    currency = (
+                        item.find("currency").text
+                    )
+
+                elif item.find("country") is not None:
+
+                    currency = (
+                        item.find("country").text
+                    )
+
+                impact = (
+                    item.find("impact").text
+                    or ""
+                )
+
+                title = (
+                    item.find("title").text
+                    or ""
+                )
+
+                date = (
+                    item.find("date").text
+                    or ""
+                )
+
+                event_time = (
+                    item.find("time").text
+                    or ""
+                )
+
+                if (
+                    currency == "USD"
+                    and "High" in impact
+                ):
+
+                    dt_string = (
+                        f"{date} {event_time}"
+                    )
 
                     ff_time = datetime.strptime(
                         dt_string,
                         "%m-%d-%Y %I:%M%p"
                     )
 
-                    # Forex Factory calendar feed uses New York time
-                    ff_timezone = pytz.timezone(
-                        "America/New_York"
-                    )
-
-                    ff_time = ff_timezone.localize(
+                    ff_time = FF_TIMEZONE.localize(
                         ff_time
                     )
 
-                    ist_time = ff_time.astimezone(
-                        TIMEZONE
+                    ist_time = (
+                        ff_time.astimezone(
+                            TIMEZONE
+                        )
                     )
 
-                    formatted_time = ist_time.strftime(
-                        "%d %b • %I:%M %p IST"
+                    formatted_time = (
+                        ist_time.strftime(
+                            "%d %b • %I:%M %p IST"
+                        )
                     )
 
                     events.append({
@@ -96,9 +138,10 @@ def get_events():
 
             except Exception as e:
 
-                print("EVENT ERROR:", e)
-
-                continue
+                print(
+                    "EVENT ERROR:",
+                    e
+                )
 
         events.sort(
             key=lambda x: x["datetime"]
@@ -108,7 +151,10 @@ def get_events():
 
     except Exception as e:
 
-        print("XML ERROR:", e)
+        print(
+            "XML ERROR:",
+            e
+        )
 
         return []
 
@@ -121,7 +167,9 @@ async def on_ready():
 
     await bot.tree.sync()
 
-    print(f"Logged in as {bot.user}")
+    print(
+        f"Logged in as {bot.user}"
+    )
 
 # ==================================================
 # /news_today
@@ -129,7 +177,7 @@ async def on_ready():
 
 @bot.tree.command(
     name="news_today",
-    description="Shows upcoming high impact USD news"
+    description="Upcoming USD news"
 )
 async def news_today(
     interaction: discord.Interaction
@@ -149,7 +197,9 @@ async def news_today(
 
         return
 
-    msg = "📅 **Upcoming High Impact USD News**\n\n"
+    msg = (
+        "📅 Upcoming High Impact USD News\n\n"
+    )
 
     for e in events[:5]:
 
@@ -166,7 +216,7 @@ async def news_today(
 
 @bot.tree.command(
     name="nextnews",
-    description="Shows next upcoming news event"
+    description="Next major USD news"
 )
 async def nextnews(
     interaction: discord.Interaction
@@ -190,7 +240,7 @@ async def nextnews(
     if not future_events:
 
         await interaction.followup.send(
-            "❌ No upcoming news found."
+            "❌ No upcoming news."
         )
 
         return
@@ -198,7 +248,7 @@ async def nextnews(
     e = future_events[0]
 
     msg = (
-        f"🚨 **Next High Impact USD News**\n\n"
+        f"🚨 Next USD News\n\n"
         f"🇺🇸 {e['title']}\n"
         f"🕒 {e['time']}"
     )
@@ -211,7 +261,7 @@ async def nextnews(
 
 @bot.tree.command(
     name="countdown",
-    description="Countdown to next high impact news"
+    description="Countdown to next news"
 )
 async def countdown(
     interaction: discord.Interaction
@@ -249,12 +299,13 @@ async def countdown(
     )
 
     hours = total_seconds // 3600
+
     minutes = (
         total_seconds % 3600
     ) // 60
 
     msg = (
-        f"⏳ **Countdown To News**\n\n"
+        f"⏳ Countdown To News\n\n"
         f"🇺🇸 {e['title']}\n"
         f"🕒 {e['time']}\n\n"
         f"⏱ {hours}h {minutes}m remaining"
@@ -268,7 +319,7 @@ async def countdown(
 
 @bot.tree.command(
     name="gold_bias",
-    description="Current XAUUSD bias"
+    description="XAUUSD market bias"
 )
 async def gold_bias(
     interaction: discord.Interaction
@@ -286,7 +337,7 @@ async def gold_bias(
 
 @bot.tree.command(
     name="risk",
-    description="Risk management reminder"
+    description="Risk reminder"
 )
 async def risk(
     interaction: discord.Interaction
@@ -295,7 +346,7 @@ async def risk(
     await interaction.response.send_message(
         "⚠️ Risk Management\n\n"
         "• Risk 0.5%–1%\n"
-        "• Reduce lot size near news\n"
+        "• Reduce size before news\n"
         "• Protect funded account"
     )
 
@@ -305,7 +356,7 @@ async def risk(
 
 @bot.tree.command(
     name="session",
-    description="Current market session"
+    description="Current trading session"
 )
 async def session(
     interaction: discord.Interaction
