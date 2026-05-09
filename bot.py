@@ -8,11 +8,11 @@ from flask import Flask
 from threading import Thread
 import xml.etree.ElementTree as ET
 
-# =====================================
+# ==================================================
 # CONFIG
-# =====================================
+# ==================================================
 
-DISCORD_WEBHOOK = os.environ.get(
+DISCORD_WEBHOOK = os.getenv(
     "DISCORD_WEBHOOK"
 )
 
@@ -21,30 +21,37 @@ FOREX_FACTORY_XML = (
     "ff_calendar_thisweek.xml"
 )
 
-TIMEZONE = pytz.timezone("Asia/Kolkata")
+TIMEZONE = pytz.timezone(
+    "Asia/Kolkata"
+)
+
+FF_TIMEZONE = pytz.timezone(
+    "America/New_York"
+)
 
 sent_alerts = set()
 
-# =====================================
-# FLASK KEEPALIVE
-# =====================================
+# ==================================================
+# FLASK
+# ==================================================
 
 app = Flask(__name__)
 
-@app.route('/')
+@app.route("/")
 def home():
-    return "Forex Factory XML Bot Running"
+
+    return "Forex Factory Bot Running"
 
 def run_flask():
 
     app.run(
-        host='0.0.0.0',
+        host="0.0.0.0",
         port=10000
     )
 
-# =====================================
+# ==================================================
 # DISCORD EMBED
-# =====================================
+# ==================================================
 
 def send_embed(
     title,
@@ -70,15 +77,21 @@ def send_embed(
             timeout=10
         )
 
-        print("Discord:", r.status_code)
+        print(
+            "Discord:",
+            r.status_code
+        )
 
     except Exception as e:
 
-        print("Discord Error:", e)
+        print(
+            "Discord Error:",
+            e
+        )
 
-# =====================================
-# GET EVENTS FROM XML
-# =====================================
+# ==================================================
+# GET EVENTS
+# ==================================================
 
 def get_events():
 
@@ -86,8 +99,10 @@ def get_events():
 
         response = requests.get(
             FOREX_FACTORY_XML,
-            timeout=15
+            timeout=10
         )
+
+        response.raise_for_status()
 
         root = ET.fromstring(
             response.content
@@ -95,71 +110,105 @@ def get_events():
 
         events = []
 
-        important_titles = [
-            "Non-Farm",
-            "CPI",
-            "FOMC",
-            "Powell",
-            "Interest Rate",
-            "PPI",
-            "Core Retail Sales",
-            "Retail Sales"
-        ]
-
         for item in root.findall("event"):
 
             try:
 
-                country = (
-                    item.find("country").text
-                )
+                currency = ""
+
+                if item.find("currency") is not None:
+
+                    currency = (
+                        item.find("currency").text
+                    )
+
+                elif item.find("country") is not None:
+
+                    currency = (
+                        item.find("country").text
+                    )
 
                 impact = (
                     item.find("impact").text
+                    or ""
                 )
 
                 title = (
                     item.find("title").text
+                    or ""
                 )
 
                 date = (
                     item.find("date").text
+                    or ""
                 )
 
                 event_time = (
                     item.find("time").text
+                    or ""
                 )
 
                 if (
-                    country == "USD"
-                    and impact == "High"
+                    currency == "USD"
+                    and "High" in impact
                 ):
 
-                    if any(
-                        k.lower() in title.lower()
-                        for k in important_titles
-                    ):
+                    dt_string = (
+                        f"{date} {event_time}"
+                    )
 
-                        events.append({
-                            "title": title,
-                            "date": date,
-                            "time": event_time
-                        })
+                    ff_time = datetime.strptime(
+                        dt_string,
+                        "%m-%d-%Y %I:%M%p"
+                    )
 
-            except:
-                pass
+                    ff_time = FF_TIMEZONE.localize(
+                        ff_time
+                    )
+
+                    ist_time = (
+                        ff_time.astimezone(
+                            TIMEZONE
+                        )
+                    )
+
+                    formatted_time = (
+                        ist_time.strftime(
+                            "%d %b • %I:%M %p IST"
+                        )
+                    )
+
+                    events.append({
+                        "title": title,
+                        "time": formatted_time,
+                        "datetime": ist_time
+                    })
+
+            except Exception as e:
+
+                print(
+                    "EVENT ERROR:",
+                    e
+                )
+
+        events.sort(
+            key=lambda x: x["datetime"]
+        )
 
         return events
 
     except Exception as e:
 
-        print("XML Error:", e)
+        print(
+            "XML ERROR:",
+            e
+        )
 
         return []
 
-# =====================================
+# ==================================================
 # WEEKLY SUMMARY
-# =====================================
+# ==================================================
 
 def weekly_summary():
 
@@ -167,114 +216,75 @@ def weekly_summary():
 
     if not events:
 
-        send_embed(
-            "⚠️ Forex Factory Error",
-            "Could not fetch weekly events"
-        )
-
         return
 
     desc = (
-        "💰 Affects: XAUUSD & NASDAQ\n\n"
+        "💰 Affects XAUUSD & NASDAQ\n\n"
     )
 
-    for e in events:
+    for e in events[:10]:
 
         desc += (
             f"🇺🇸 {e['title']}\n"
-            f"📅 {e['date']}\n"
             f"🕒 {e['time']}\n\n"
         )
 
     send_embed(
-        "📅 HIGH IMPACT USD NEWS THIS WEEK",
+        "📅 Weekly USD News",
         desc,
         16753920
     )
 
-# =====================================
-# 15-MINUTE ALERTS
-# =====================================
+# ==================================================
+# 15 MINUTE ALERTS
+# ==================================================
 
 def check_alerts():
 
-    now = datetime.now(TIMEZONE)
-
-    current = now.strftime(
-        "%Y-%m-%d %H:%M"
+    now = datetime.now(
+        TIMEZONE
     )
 
     events = get_events()
 
     for e in events:
 
-        try:
+        reminder = (
+            e["datetime"] -
+            timedelta(minutes=15)
+        )
 
-            dt_string = (
-                f"{e['date']} "
-                f"{e['time']}"
+        reminder_key = (
+            f"{e['title']}_{reminder}"
+        )
+
+        if (
+            now >= reminder
+            and reminder_key
+            not in sent_alerts
+        ):
+
+            desc = (
+                f"🇺🇸 {e['title']}\n\n"
+                f"🕒 {e['time']}\n\n"
+                f"⚠️ High volatility expected\n"
+                f"• XAUUSD\n"
+                f"• NASDAQ"
             )
 
-            event_dt = datetime.strptime(
-                dt_string,
-                "%m-%d-%Y %I:%M%p"
+            send_embed(
+                "🚨 USD NEWS IN 15 MINUTES",
+                desc,
+                16711680
             )
 
-            event_dt = TIMEZONE.localize(
-                event_dt
+            sent_alerts.add(
+                reminder_key
             )
 
-            reminder = (
-                event_dt -
-                timedelta(minutes=15)
-            ).strftime("%Y-%m-%d %H:%M")
-
-            unique_id = (
-                f"{e['title']}_{reminder}"
-            )
-
-            if (
-                current == reminder
-                and unique_id not in sent_alerts
-            ):
-
-                desc = (
-                    f"🇺🇸 {e['title']}\n\n"
-                    f"⚠️ High volatility expected\n\n"
-                    f"Most affected:\n"
-                    f"• XAUUSD\n"
-                    f"• NASDAQ\n\n"
-                    f"Consider reducing risk "
-                    f"before release."
-                )
-
-                send_embed(
-                    "🚨 NEWS IN 15 MINUTES",
-                    desc,
-                    16711680
-                )
-
-                sent_alerts.add(unique_id)
-
-        except Exception as ex:
-
-            print("Alert Error:", ex)
-
-# =====================================
-# DAILY CLEANUP
-# =====================================
-
-def reset_alerts():
-
-    global sent_alerts
-
-    sent_alerts = set()
-
-    print("Alerts reset")
-
-# =====================================
+# ==================================================
 # SCHEDULES
-# =====================================
+# ==================================================
 
 schedule.every().sunday.at(
     "18:00"
@@ -284,13 +294,9 @@ schedule.every(1).minutes.do(
     check_alerts
 )
 
-schedule.every().day.at(
-    "00:05"
-).do(reset_alerts)
-
-# =====================================
+# ==================================================
 # MAIN LOOP
-# =====================================
+# ==================================================
 
 def run_bot():
 
@@ -306,9 +312,9 @@ def run_bot():
 
         time.sleep(30)
 
-# =====================================
+# ==================================================
 # START
-# =====================================
+# ==================================================
 
 if __name__ == "__main__":
 
