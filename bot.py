@@ -32,7 +32,7 @@ FF_TIMEZONE = pytz.timezone(
 sent_alerts = set()
 
 # ==================================================
-# FLASK
+# FLASK KEEPALIVE
 # ==================================================
 
 app = Flask(__name__)
@@ -40,7 +40,7 @@ app = Flask(__name__)
 @app.route("/")
 def home():
 
-    return "Forex Factory Bot Running"
+    return "Forex Factory News Bot Running"
 
 def run_flask():
 
@@ -56,7 +56,7 @@ def run_flask():
 def send_embed(
     title,
     description,
-    color=16711680
+    color
 ):
 
     data = {
@@ -148,41 +148,59 @@ def get_events():
                     or ""
                 )
 
-                if (
-                    currency == "USD"
-                    and "High" in impact
-                ):
+                # ONLY USD NEWS
+                if currency == "USD":
 
-                    dt_string = (
-                        f"{date} {event_time}"
-                    )
+                    # RED + ORANGE
+                    if (
+                        "High" in impact
+                        or "Medium" in impact
+                    ):
 
-                    ff_time = datetime.strptime(
-                        dt_string,
-                        "%m-%d-%Y %I:%M%p"
-                    )
-
-                    ff_time = FF_TIMEZONE.localize(
-                        ff_time
-                    )
-
-                    ist_time = (
-                        ff_time.astimezone(
-                            TIMEZONE
+                        dt_string = (
+                            f"{date} {event_time}"
                         )
-                    )
 
-                    formatted_time = (
-                        ist_time.strftime(
-                            "%d %b • %I:%M %p IST"
+                        ff_time = datetime.strptime(
+                            dt_string,
+                            "%m-%d-%Y %I:%M%p"
                         )
-                    )
 
-                    events.append({
-                        "title": title,
-                        "time": formatted_time,
-                        "datetime": ist_time
-                    })
+                        ff_time = FF_TIMEZONE.localize(
+                            ff_time
+                        )
+
+                        ist_time = (
+                            ff_time.astimezone(
+                                TIMEZONE
+                            )
+                        )
+
+                        formatted_time = (
+                            ist_time.strftime(
+                                "%A • %I:%M %p IST"
+                            )
+                        )
+
+                        if "High" in impact:
+
+                            folder = "🔴 RED"
+
+                            color = 16711680
+
+                        else:
+
+                            folder = "🟠 ORANGE"
+
+                            color = 16753920
+
+                        events.append({
+                            "title": title,
+                            "time": formatted_time,
+                            "datetime": ist_time,
+                            "folder": folder,
+                            "color": color
+                        })
 
             except Exception as e:
 
@@ -222,15 +240,16 @@ def weekly_summary():
         "💰 Affects XAUUSD & NASDAQ\n\n"
     )
 
-    for e in events[:10]:
+    for e in events:
 
         desc += (
-            f"🇺🇸 {e['title']}\n"
+            f"{e['folder']} "
+            f"{e['title']}\n"
             f"🕒 {e['time']}\n\n"
         )
 
     send_embed(
-        "📅 Weekly USD News",
+        "📅 WEEKLY FOREX FACTORY NEWS",
         desc,
         16753920
     )
@@ -254,45 +273,63 @@ def check_alerts():
             timedelta(minutes=15)
         )
 
-        reminder_key = (
+        key = (
             f"{e['title']}_{reminder}"
         )
 
         if (
             now >= reminder
-            and reminder_key
-            not in sent_alerts
+            and key not in sent_alerts
         ):
 
             desc = (
-                f"🇺🇸 {e['title']}\n\n"
+                f"{e['folder']} "
+                f"{e['title']}\n\n"
                 f"🕒 {e['time']}\n\n"
-                f"⚠️ High volatility expected\n"
+                f"⚠️ VOLATILITY WARNING\n"
                 f"• XAUUSD\n"
-                f"• NASDAQ"
+                f"• NASDAQ\n"
+                f"• USD Pairs"
             )
 
             send_embed(
-                "🚨 USD NEWS IN 15 MINUTES",
+                "🚨 NEWS IN 15 MINUTES",
                 desc,
-                16711680
+                e["color"]
             )
 
-            sent_alerts.add(
-                reminder_key
-            )
+            sent_alerts.add(key)
+
+# ==================================================
+# RESET ALERTS DAILY
+# ==================================================
+
+def reset_alerts():
+
+    global sent_alerts
+
+    sent_alerts = set()
+
+    print("Alerts reset")
 
 # ==================================================
 # SCHEDULES
 # ==================================================
 
+# WEEKLY NEWS
 schedule.every().sunday.at(
-    "18:00"
+    "17:00"
 ).do(weekly_summary)
 
+# CHECK ALERTS
 schedule.every(1).minutes.do(
     check_alerts
 )
+
+# RESET DAILY
+schedule.every().day.at(
+    "00:05"
+).do(reset_alerts)
 
 # ==================================================
 # MAIN LOOP
@@ -301,8 +338,8 @@ schedule.every(1).minutes.do(
 def run_bot():
 
     send_embed(
-        "✅ Forex Factory XML Bot LIVE",
-        "XAUUSD & NASDAQ alerts activated",
+        "✅ FOREX FACTORY BOT LIVE",
+        "Red + Orange Folder Alerts Activated",
         65280
     )
 
